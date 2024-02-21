@@ -136,17 +136,14 @@ class Parameter:
         out._backward = _backward
         return out
 
-    def mean(self, dims: Tuple[int], keepdim=True) -> "Parameter":
-        m = np.mean(self.data, dims, keepdims=keepdim)
+    def mean(self, dim: Tuple[int], keepdim=True) -> "Parameter":
+        m = np.mean(self.data, dim, keepdims=keepdim)
         out = Parameter(m, _children=(self,))
 
         def _backward():
             original_shape = [int(_) for _ in self.data.shape]
-            new_shape = [original_shape[d] for d in dims]
-            out_grad = out.grad
-            for d in dims:
-                out_grad = np.repeat(out_grad, original_shape[d], d)
-
+            new_shape = [original_shape[d] for d in dim]
+            out_grad = out.grad if keepdim else np.expand_dims(out.grad, dim)
             self.grad += out_grad / np.prod(new_shape)
 
         out._backward = _backward

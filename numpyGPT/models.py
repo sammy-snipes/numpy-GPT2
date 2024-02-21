@@ -1,7 +1,6 @@
-from typing import Any, Union, Dict, List, Tuple
+from typing import Any, Union, List, Tuple
 import numpy as np
 import string
-from numpy.random import pareto
 import torch
 import torch.nn as nn
 from numpyGPT.engine import Parameter
@@ -242,7 +241,6 @@ class MultiheadAttention(Module):
         return self.set_attrs(x, self, attrs)
 
     def forward(self, x: Parameter):
-        # B, T, C = x.shape
         qvk = self.in_proj(x)
         qvk = rearrange(qvk, "b t (d k h) -> k b h t d", k=3, h=self.num_heads)
         q, v, k = qvk.split(0)
@@ -277,7 +275,7 @@ class Block(Module):
         )
 
     def forward(self, x):
-        x = x + self.attn(self.ln1(x))  # Resnet connection
+        x = x + self.attn(self.ln1(x))
         x = x + self.mlp(self.ln2(x))
         return x
 
@@ -348,15 +346,6 @@ class GPT(Module):
             ],
             [],
         )
-
-    # def generate(self, idx, new_tokens):
-    #     for _ in range(new_tokens):
-    #         idx_cond = idx[:, -seq_length:]
-    #         logits = self(idx_cond)[:, -1, :]
-    #         probs = F.softmax(logits, dim=-1)
-    #         idx_next = torch.multinomial(probs, num_samples=1)
-    #         idx = torch.cat((idx, idx_next), dim=1)
-    #     return idx
 
 
 CONVERSION_DICT = {

@@ -45,7 +45,7 @@ class Block(nn.Module):
         )
 
     def forward(self, x):
-        x = x + self.attn(self.ln1(x))  # Resnet connection
+        x = x + self.attn(self.ln1(x))
         x = x + self.mlp(self.ln2(x))
         return x
 
@@ -63,15 +63,6 @@ class GPT(nn.Module):
         self.ln_f = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size)
         self.device = device
-        self.apply(self._init_weights)
-
-    def _init_weights(self, module):
-        if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=0, std=0.02)
-            if module.bias is not None:
-                torch.nn.init.zeros_(module.bias)
-        elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, mean=0, std=0.02)
 
     def forward(self, idx):
         B, T = idx.shape
@@ -91,59 +82,3 @@ class GPT(nn.Module):
             idx_next = torch.multinomial(probs, num_samples=1)
             idx = torch.cat((idx, idx_next), dim=1)
         return idx
-
-
-if __name__ == "__main__":
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    device = "cpu"
-    batch_size = 16
-    seq_length = 64
-    max_iters = 10000
-
-    with open("test.txt", "r", encoding="utf-8") as f:
-        text = f.read()
-
-    chars = sorted(list(set(text)))
-    vocab_size = len(chars)
-
-    s_to_i = {ch: i for i, ch in enumerate(chars)}
-    i_to_s = {i: ch for i, ch in enumerate(chars)}
-
-    encode = lambda s: [s_to_i[c] for c in s]
-    decode = lambda l: "".join([i_to_s[i] for i in l])
-
-    data = torch.tensor(encode(text), dtype=torch.long)
-
-    def get_batch():
-        ix = torch.randint(len(data) - seq_length, (batch_size,))
-        x = torch.stack([data[i : i + seq_length] for i in ix])
-        y = torch.stack([data[i + 1 : i + 1 + seq_length] for i in ix])
-        x, y = x.to(device), y.to(device)
-        return x, y
-
-    model = GPT(
-        embed_dim=256,
-        num_heads=8,
-        seq_length=seq_length,
-        n_blocks=4,
-        vocab_size=vocab_size,
-        device=device,
-    )
-    optim = torch.optim.Adam(model.parameters())
-    loss = nn.CrossEntropyLoss()
-
-    print_every = 100
-    for iter in range(max_iters):
-        x, y = get_batch()
-        optim.zero_grad()
-        logits = model(x)
-        logits = rearrange(logits, "B T C -> (B T) C")
-        targets = rearrange(y, "B T -> (B T)")
-        err = loss(logits, targets)
-        err.backward()
-        optim.step()
-
-        if iter % print_every == 0:
-            print(25 * "=", f"iter : {iter}", 25 * "=")
-            context = torch.zeros((1, 1), dtype=torch.long, device=device)
-            print(decode(model.generate(context, new_tokens=500)[0].tolist()))
